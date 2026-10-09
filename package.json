@@ -1,0 +1,45 @@
+{
+  "name": "beauty-opencode",
+  "version": "3.1.5",
+  "private": true,
+  "description": "OpenCode desktop layout switcher",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "build:icon": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-icon.ps1",
+    "build": "npm run build:icon && electron-builder --win portable",
+    "test": "node --test electron/patch.test.cjs electron/native-v2.test.cjs"
+  },
+  "devDependencies": {
+    "electron": "^40.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "dependencies": {
+    "acorn": "^8.19.0",
+    "lucide": "^0.468.0"
+  },
+  "build": {
+    "appId": "com.beauty.opencode",
+    "productName": "Beauty OpenCode",
+    "directories": {
+      "output": "dist/electron"
+    },
+    "files": [
+      "electron/**",
+      "assets/**",
+      "themes/**",
+      "screenshots/**",
+      "package.json"
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": "portable",
+      "artifactName": "Beauty-OpenCode-Electron.exe"
+    },
+    "afterPack": "electron/verify-package.cjs"
+  },
+  "author": {
+    "name": "炽阳001",
+    "url": "https://github.com/Chiyang001?tab=repositories"
+  }
+}

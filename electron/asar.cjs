@@ -1,0 +1,11 @@
+const fs=process.versions.electron?require('original-fs'):require('node:fs');
+const crypto=require('node:crypto');
+const sha=data=>crypto.createHash('sha256').update(data).digest('hex');
+const digest=file=>sha(fs.readFileSync(file));
+class Archive {
+  constructor(file){this.data=fs.readFileSync(file);const d=this.data;if(d.length<16||d.readUInt32LE(0)!==4||d.readUInt32LE(4)>64*1024*1024)throw Error('无效的 ASAR 资源');this.base=8+d.readUInt32LE(4);this.header=JSON.parse(d.subarray(16,16+d.readUInt32LE(12)).toString());this.index=new Map(this.entries());}
+  *entries(tree=this.header,prefix=''){for(const [name,value] of Object.entries(tree.files||{})){const key=prefix+name;if(value.files)yield* this.entries(value,key+'/');else yield [key,value];}}
+  read(name){const v=this.index.get(name);if(!v||v.unpacked||v.link)throw Error('无法读取资源：'+name);const data=this.data.subarray(this.base+Number(v.offset),this.base+Number(v.offset)+v.size);if(data.length!==v.size)throw Error('资源损坏');return data;}
+  repack(file,replacements){const header=structuredClone(this.header),chunks=[];for(const name of Object.keys(replacements)){if(this.index.has(name))continue;const parts=name.split('/');let tree=header;for(const part of parts.slice(0,-1)){tree.files??={};tree.files[part]??={files:{}};tree=tree.files[part];}tree.files??={};tree.files[parts.at(-1)]={size:0,offset:'0',integrity:{blockSize:4194304}};}let offset=0;for(const [name,v] of this.entries(header)){if(v.unpacked||v.link)continue;const data=replacements[name]||this.read(name);v.offset=String(offset);v.size=data.length;offset+=data.length;if(replacements[name]&&v.integrity){const blockSize=v.integrity.blockSize||4194304,blocks=[];for(let i=0;i<Math.max(data.length,1);i+=blockSize)blocks.push(sha(data.subarray(i,i+blockSize)));v.integrity={algorithm:'SHA256',hash:sha(data),blockSize,blocks};}chunks.push(data);}const raw=Buffer.from(JSON.stringify(header)),size=4+raw.length+(4-raw.length%4)%4,prefix=Buffer.alloc(16);prefix.writeUInt32LE(4,0);prefix.writeUInt32LE(size+4,4);prefix.writeUInt32LE(size,8);prefix.writeUInt32LE(raw.length,12);fs.writeFileSync(file,Buffer.concat([prefix,raw,Buffer.alloc((4-raw.length%4)%4),...chunks]));}
+}
+module.exports={Archive,sha,digest};
