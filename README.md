@@ -1,4 +1,4 @@
-<p align="center"><a href="https://space.bilibili.com/404891612"><img src="developer.png" width="96" height="96" alt="炽阳001 的 logo"></a>&nbsp;&nbsp;&nbsp;&nbsp;<img src="logo.png" width="96" height="96" alt="Beauty OpenCode logo"></p>
+<p align="center"><img src="docs/readme-header.svg" width="256" height="112" alt="炽阳001 与 Beauty OpenCode，圆角 logo 与竖线分隔"></p>
 
 <h1 align="center">Beauty OpenCode</h1>
 <p align="center"><strong>让 OpenCode 拥有更舒适的桌面布局</strong></p>
@@ -43,17 +43,17 @@ Beauty OpenCode 是为 **Windows Electron 版 OpenCode** 制作的独立布局�
 
 ## 兼容与恢复
 
-- 适用于 Windows Electron OpenCode，已在 **2.0.26** 原包上完成补丁完整性与恢复验证；保留 **1.18.x** 旧架构适配。
-- 支持 `@opencode-ai/desktop` 和 `@opencode/desktop` 包名。应用前检查资源结构与挂载点，结构变化时会停止写入；后续版本的兼容性取决于其结构。
+- 适用于 Windows Electron OpenCode，已在 **2.0.26** 原包上完成补丁完整性与恢复验证。保留 **1.18.x** 旧架构适配。
+- 支持 `@opencode-ai/desktop` 和 `@opencode/desktop` 包名。应用前检查资源结构与挂载点，结构变化时会停止写入。后续版本的兼容性取决于其结构。
 - 原始备份为 `resources/app.asar.beauty-original`，校验记录为 `resources/beauty-opencode.json`。
-- 使用 SHA-256 校验、临时文件及原子替换；OpenCode 运行期间拒绝修改。资源被升级或被其他程序修改时，拒绝用旧备份覆盖。
+- 使用 SHA-256 校验、临时文件及原子替换。OpenCode 运行期间拒绝修改。资源被升级或被其他程序修改时，拒绝用旧备份覆盖。
 - **更新 OpenCode 前，请先切换回经典模式。**
 
 > 本项目不是官方 OpenCode 插件。它提供视觉和导航布局调整，不包含 Codex 的后端、账户或任务管理服务。
 
 ## 开发与打包
 
-需要 Node.js 与 npm；Windows 打包还需要 PowerShell。
+需要 Node.js 与 npm。Windows 打包还需要 PowerShell。
 
 ```powershell
 npm ci
