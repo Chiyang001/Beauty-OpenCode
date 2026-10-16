@@ -33,6 +33,9 @@ test('Native v2 migrates complete assets and follows renamed build symbols',()=>
   const wrapped={index:arc.index,read:n=>n===main?Buffer.from(changed):arc.read(n)};
   const result=patch.build(wrapped);assert.equal(result.adapter,'native-v2');
   const code=result.replacements[main].toString();
+  assert(!code.includes('beautyNativeServers'),'Sidebar does not mount custom server controls');
+  assert(!code.includes('panel.prepend(serverControls)'),'Server form is not inserted ahead of the sidebar header');
+  assert(code.includes("add('服务器管理…','settings',()=>navigate('/?beautyOverview=1'))"),'Native server management stays accessible from the menu');
   assert(code.includes('beauty-session-more'),'Session rows expose the menu trigger');
   assert(code.includes("add('永久删除','trash',()=>remove.click())"),'Menu retains confirmed permanent deletion');
   assert(code.includes('sessions.session.rename(ServerConnection.key(home.server.focused()),session,value)'),'Menu uses native session rename');
@@ -42,4 +45,21 @@ test('Native v2 migrates complete assets and follows renamed build symbols',()=>
   assert(Object.values(result.replacements).some(b=>b.includes(Buffer.from('window.beautyReasoningSlider('))));
   assert(Object.values(result.replacements).some(b=>b.includes(Buffer.from('window.beautyAppearanceSection({controller:'))));
   assert.throws(()=>patch.build({index:arc.index,read:n=>n===main?Buffer.from(source.replace('data-slot=vertical-tabs-sidebar','data-slot=changed-sidebar')):arc.read(n)}),/结构|挂载|控制器/);
+});
+
+test('Session status discovery supports both notification APIs and renamed controllers',()=>{
+  const installed=patch.paths(patch.defaultFolder),arc=new Archive(fs.existsSync(installed.b)?installed.b:installed.a);
+  const main=[...arc.index.keys()].find(n=>/^out\/renderer\/assets\/main-.*\.js$/.test(n));
+  const source=arc.read(main).toString(),{tree,discover}=require('./native-v2.cjs');
+  const binding=discover(source).aliases.nativeSessionStatus;
+  const controller=tree(source).nodes.find(({node})=>node.type==='FunctionDeclaration'&&node.id.name===binding).node;
+  const code=source.slice(controller.start,controller.end);
+  assert(code.includes('notification.session.'));
+  for(const api of ['unread','unseenCount']){
+    const changed=code.replace(/notification\.session\.(?:unseenCount|unread)/g,'notification.session.'+api).replace('function '+binding+'(','function renamedStatus(');
+    const variant=source.slice(0,controller.start)+changed+source.slice(controller.end);
+    assert.equal(discover(variant).aliases.nativeSessionStatus,'renamedStatus');
+    const result=patch.build({index:arc.index,read:n=>n===main?Buffer.from(variant):arc.read(n)});
+    assert(result.replacements[main].toString().includes('nativeSessionStatus=renamedStatus'));
+  }
 });

@@ -33,7 +33,6 @@ body[data-beauty] [data-beauty-draft-content]>div{max-width:none!important}
 body[data-beauty] .settings-content{max-width:none!important;width:100%!important;min-width:0!important;padding:0!important}
 body[data-beauty] .settings-screen .settings-panel{padding:40px 30px 60px!important}
 body[data-beauty] .settings-screen>.settings{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
-body[data-beauty] .settings-screen .settings-back:not(.beauty-settings-back){display:none!important}
 body[data-beauty] .settings-screen [data-component="settings-row"]:has([data-action="settings-color-scheme"]),body[data-beauty] .settings-screen [data-component="settings-row"]:has([data-action="settings-theme"]){display:none!important}
 body[data-beauty] .settings-screen [data-component="settings-v2-row"]{display:flex;align-items:center;justify-content:space-between}
 body[data-beauty] .settings-screen [data-slot="settings-v2-row-copy"]{min-width:0;flex:1}
@@ -101,7 +100,9 @@ body[data-beauty] .beauty-settings-head .settings-search:before,body[data-beauty
 body[data-beauty] .settings-screen,body[data-beauty] .settings-screen *{scrollbar-width:none!important;-ms-overflow-style:none!important}
 body[data-beauty] .settings-screen::-webkit-scrollbar,body[data-beauty] .settings-screen *::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
 body[data-beauty] [data-slot="composer-controls"]>div{justify-content:flex-end!important}
-body[data-beauty] .settings-screen .beauty-select-trigger{min-height:30px!important;border:1px solid var(--beauty-c-353535,#353535)!important;border-radius:12px!important;background:var(--beauty-c-181818,#181818)!important;color:var(--beauty-c-ddd,#ddd)!important;padding:5px 12px!important;font:13px/18px "Segoe UI","Microsoft YaHei UI",sans-serif!important;gap:12px!important}
+body[data-beauty] .settings-screen .beauty-select-trigger{display:inline-flex!important;align-items:center!important;justify-content:space-between;min-height:30px!important;border:1px solid var(--beauty-c-353535,#353535)!important;border-radius:12px!important;background:var(--beauty-c-181818,#181818)!important;color:var(--beauty-c-ddd,#ddd)!important;padding:5px 12px!important;font:13px/18px "Segoe UI","Microsoft YaHei UI",sans-serif!important;gap:12px!important}
+body[data-beauty] .beauty-select-chevron{display:inline-flex;align-items:center;justify-content:center;flex:none;width:14px;height:18px;line-height:0;overflow:visible}
+body[data-beauty] .beauty-select-chevron svg{display:block;width:14px;height:14px;flex:none}
 body[data-beauty] .beauty-select-menu,body[data-beauty] [data-component="select-v2-content"],body[data-beauty] [data-slot="select-v2-content"]{position:fixed;z-index:10000;box-sizing:border-box;background:var(--beauty-c-252525,#252525)!important;color:var(--beauty-c-eee,#eee)!important;border:1px solid var(--beauty-c-3b3b3b,#3b3b3b)!important;border-radius:14px!important;padding:6px!important;box-shadow:0 12px 36px #0003!important}
 body[data-beauty] .beauty-select-option{width:100%;min-height:32px;padding:7px 12px!important;border:0!important;border-radius:9px!important;text-align:left;justify-content:flex-start;font-size:13px!important}
 body[data-beauty] .beauty-select-option:hover,body[data-beauty] .beauty-select-option:focus-visible{background:var(--beauty-c-353535,#353535)!important;outline:0!important}
@@ -110,11 +111,10 @@ body[data-beauty] .beauty-settings-head *:before,body[data-beauty] .beauty-setti
 body[data-beauty] [data-component="menu-v2-content"] input,body[data-beauty] [data-component="select-v2-content"] input,body[data-beauty] [data-component="menu-v2-content"] input:focus-visible,body[data-beauty] [data-component="select-v2-content"] input:focus-visible{border:0!important;outline:0!important;box-shadow:none!important}
 body[data-beauty] [data-component="menu-v2-item"],body[data-beauty] [data-component="select-v2-item"]{border-radius:9px!important;min-height:32px!important;font-size:13px!important}
 /* Shared controls cover native dialogs, popovers and full-page settings alike. */
-body[data-beauty] :is([data-component="button"],[data-component="button-v2"]){border-radius:12px!important;background-image:none!important;box-shadow:none!important;font-size:13px!important}
-body[data-beauty] :is([data-component="icon-button"],[data-component="icon-button-v2"]){border-radius:10px!important;background-image:none!important;box-shadow:none!important}
-body[data-beauty] [role="dialog"] button:not(.beauty-theme-card){border-radius:12px!important;box-shadow:none!important;font-size:13px!important}
+body[data-beauty] :is([data-component="button"],[data-component="button-v2"]){border-radius:12px!important;box-shadow:none!important;font-size:13px!important}
+body[data-beauty] :is([data-component="icon-button"],[data-component="icon-button-v2"]){border-radius:10px!important;box-shadow:none!important}
+body[data-beauty] [role="dialog"] button:not(.beauty-theme-card){border-radius:999px!important;box-shadow:none!important;font-size:13px!important}
 body[data-beauty] [role="dialog"] :is([data-component="button"],[data-component="button-v2"])[data-variant="neutral"]{background:var(--beauty-c-303030,#303030)!important;color:var(--beauty-c-ddd,#ddd)!important;border:1px solid var(--beauty-c-353535,#353535)!important}
-body[data-beauty] [role="dialog"] :is([data-component="button"],[data-component="button-v2"]):is([data-variant="contrast"],[data-variant="primary"],[data-variant="accent"]){background:var(--beauty-accent,#3478cf)!important;color:#fff!important;border:1px solid transparent!important}
 body[data-beauty] :is([data-component="dialog"],[data-component="dialog-v2"]) [data-slot="dialog-content"]{border-radius:24px!important;background:var(--beauty-c-242424,#242424)!important;color:var(--beauty-c-eee,#eee)!important;border:1px solid var(--beauty-c-353535,#353535)!important;box-shadow:0 20px 70px #0003!important}
 body[data-beauty] [data-slot="dialog-header"]{padding:20px!important;gap:16px!important}
 body[data-beauty] [data-slot="dialog-title"]{font-size:20px!important;line-height:28px!important;font-weight:600!important}
@@ -138,7 +138,7 @@ body[data-beauty] :is([data-component="dialog"],[data-component="dialog-v2"]) [d
 body[data-beauty] button:not([data-action="composer-submit"]):not([data-beauty-send]):not(.beauty-icon-only):not(.beauty-timeline-mark):not(.beauty-theme-card){border-radius:12px!important}
 /* The sticky title's following sibling supplies the native fading backdrop. */
 body[data-beauty] [data-session-title]+[aria-hidden="true"]{background:transparent!important;background-image:none!important;box-shadow:none!important;filter:none!important;backdrop-filter:none!important}
-body[data-beauty] [data-session-title],body[data-beauty] [data-session-title]>div{box-shadow:none!important;filter:none!important;backdrop-filter:none!important}
+body[data-beauty] [data-session-title],body[data-beauty] [data-session-title]>div{background:transparent!important;background-image:none!important;box-shadow:none!important;filter:none!important;backdrop-filter:none!important}
 
 /* Modal portal roots cover the viewport only for positioning, never as a surface. */
 body[data-beauty] [data-component="dialog-v2"]:not(:has(.settings-v2-dialog)),body[data-beauty] [data-component="dialog"]:has([data-slot="dialog-container"]):not(:has(.settings-v2-dialog)){background:transparent!important;background-image:none!important;border:0!important;border-radius:0!important;box-shadow:none!important}
@@ -152,3 +152,21 @@ body[data-beauty] .settings-screen [data-component="settings-list"],body[data-be
 body[data-beauty] .settings-shortcuts .settings-section>div{padding-block:8px!important;overflow:visible!important}
 body[data-beauty] .settings-shortcuts [data-keybind-id]{flex-shrink:0}
 body[data-beauty] .settings-shortcuts [data-component="settings-list"]>div{box-sizing:border-box!important;min-height:40px!important;padding:8px 0!important;margin-block:0!important;line-height:20px!important}
+
+/* Expanded reasoning/tool summaries retain sticky positioning without an opaque strip. */
+body[data-beauty] [data-component="collapsed-tool-group"]>[data-component="collapsible"].tool-collapsible>[data-slot="collapsible-trigger"][aria-expanded="true"]{background:transparent!important;background-image:none!important;box-shadow:none!important}
+
+body[data-beauty] :is([role="dialog"],[role="alertdialog"],[data-component="dialog"],[data-component="dialog-v2"],.beauty-rename-actions) button:not(.beauty-theme-card){border-radius:999px!important}
+
+/* Theme native controls through their own color tokens, keeping variant/state effects. */
+body[data-beauty] :is([data-component="button"],[data-component="button-v2"],[data-component="icon-button"],[data-component="icon-button-v2"]){
+  --v2-background-bg-contrast:var(--beauty-accent,#3478cf)!important;
+  --v2-background-bg-icon-button-contrast:var(--beauty-accent,#3478cf)!important;
+  --v2-text-text-contrast:var(--beauty-button-on-accent,#fff)!important;
+  --v2-background-bg-button-neutral:var(--beauty-c-303030,#303030)!important;
+  --v2-text-text-base:var(--beauty-c-ddd,#ddd)!important;
+  --v2-text-text-muted:var(--beauty-c-aaa,#aaa)!important;
+  --v2-border-border-muted:var(--beauty-c-353535,#353535)!important;
+}
+body[data-beauty] :is([data-component="button"],[data-component="button-v2"]):is([data-variant="primary"],[data-variant="accent"]){background:linear-gradient(var(--beauty-accent,#3478cf),var(--beauty-accent,#3478cf));color:var(--beauty-button-on-accent,#fff)}
+body[data-beauty] :is([data-component="button"],[data-component="button-v2"]):is([data-variant="primary"],[data-variant="accent"]):is(:hover,[data-state="hover"]):not(:disabled){filter:brightness(1.08)}

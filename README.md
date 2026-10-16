@@ -25,10 +25,10 @@ Beauty OpenCode 是为 **Windows Electron 版 OpenCode** 制作的独立布局�
 
 | 功能 | 体验 |
 | --- | --- |
-| 项目与聊天导航 | 项目分组、最近聊天、搜索、置顶、重命名和草稿切换 |
+| 项目与聊天导航 | 项目分组、最近聊天、搜索、置顶图标、重命名、草稿切换与侧栏宽度拖动 |
 | 更整洁的对话区 | 底部输入框、原生项目信息条、圆形发送与停止按钮 |
 | 个性化外观 | 八套预设主题、深浅色及跟随系统、自定义壁纸 |
-| 分类设置页 | 分类导航、搜索与卡片布局，保留原生设置控件 |
+| 分类设置页 | 分类导航、搜索与卡片布局，保留原生返回并补充配对功能中文 |
 | 桌面操作 | 文件 / 编辑 / 视图 / 帮助菜单、Windows 窗口控件、`Ctrl+B` 切换侧栏 |
 | 备份与恢复 | 保留原始资源，校验完整性，一键恢复经典模式 |
 
@@ -43,7 +43,7 @@ Beauty OpenCode 是为 **Windows Electron 版 OpenCode** 制作的独立布局�
 
 ## 兼容与恢复
 
-- 适用于 Windows Electron OpenCode，已在 **2.0.26** 原包上完成补丁完整性与恢复验证。保留 **1.18.x** 旧架构适配。
+- 适用于 Windows Electron OpenCode，已在 **2.0.30** 原包上完成补丁完整性与恢复验证。保留 **1.18.x** 旧架构适配。
 - 支持 `@opencode-ai/desktop` 和 `@opencode/desktop` 包名。应用前检查资源结构与挂载点，结构变化时会停止写入。后续版本的兼容性取决于其结构。
 - 原始备份为 `resources/app.asar.beauty-original`，校验记录为 `resources/beauty-opencode.json`。
 - 使用 SHA-256 校验、临时文件及原子替换。OpenCode 运行期间拒绝修改。资源被升级或被其他程序修改时，拒绝用旧备份覆盖。
@@ -59,6 +59,7 @@ Beauty OpenCode 是为 **Windows Electron 版 OpenCode** 制作的独立布局�
 npm ci
 npm start
 npm test
+npm run test:ui
 npm run build
 ```
 
@@ -68,7 +69,20 @@ npm run build
 dist/electron/Beauty-OpenCode-Electron.exe
 ```
 
+受限网络可在当前 PowerShell 会话中选择镜像，再安装与构建（关闭终端即可恢复；已有环境变量可保留自己的镜像）：
+
+```powershell
+$env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
+$env:ELECTRON_BUILDER_BINARIES_MIRROR = "https://npmmirror.com/mirrors/electron-builder-binaries/"
+npm ci --registry=https://registry.npmmirror.com
+npm run build
+```
+
+通过本地代理构建时，将 `HTTPS_PROXY` / `HTTP_PROXY` 设为实际代理地址，并设置 `ELECTRON_GET_USE_PROXY=1`。离线环境需提前填充 Electron 与 electron-builder 缓存，或在构建配置中通过 `electronDist` 指向已解压的目标版本 Electron。仅安装源码依赖、无需运行 Electron 时可设置 `ELECTRON_SKIP_BINARY_DOWNLOAD=1`；实际启动和打包仍需要目标 Electron 二进制，不能靠跳过下载完成离线构建。
+
 构建结束前会逐字节校验打包的源码、图片、主题和截图，确认它们与本地输入文件一致。
+
+`npm run test:ui` 使用 Electron 内置 Chromium 验证按钮与消息配色、滑块对比度、侧栏宽度、滚动条和流式时间轴。服务器管理位于“文件 → 服务器管理…”，打开 OpenCode 原生首页；Beauty 侧栏不再插入服务器表单。
 
 | 路径 | 用途 |
 | --- | --- |

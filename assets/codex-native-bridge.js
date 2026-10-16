@@ -67,7 +67,7 @@ function beautyNativeDecorateSettings(navigate) {
   const screen = document.querySelector('[data-testid="settings-screen"]');
   document.body.classList.toggle("beauty-native-settings", !!screen);
   if (!screen) return;
-  screen.dataset.beautySettings = "";
+  if (screen.dataset.beautySettings !== "") screen.dataset.beautySettings = "";
   const nav = screen.querySelector(".settings-nav");
   if (!nav || nav.querySelector(".beauty-settings-head")) return;
   const header = beautyElement("div", "beauty-settings-head");
@@ -98,13 +98,6 @@ function beautyNativeDecorateSettings(navigate) {
   search.addEventListener("input", filter);
   const observer = new MutationObserver(filter);
   observer.observe(screen, { childList: true, subtree: true });
-  const back = beautyButton(
-    "‹ 返回聊天",
-    "",
-    () => navigate("/"),
-    "beauty-settings-back",
-  );
-  nav.append(back);
   const removal = new MutationObserver(() => {
     if (!nav.isConnected) {
       observer.disconnect();
@@ -124,12 +117,12 @@ function beautyNativeDecorateDraft(main, tabs, layout) {
   );
   const form = draft.querySelector('[data-component="composer"]');
   if (!wordmark || !form) return;
-  draft.dataset.beautyDraft = "";
+  if (draft.dataset.beautyDraft !== "") draft.dataset.beautyDraft = "";
   wordmark.hidden = true;
   const controls = form.parentElement.parentElement.parentElement;
   const outer = controls.parentElement.parentElement;
-  outer.dataset.beautyDraftContent = "";
-  controls.dataset.beautyDraftControls = "";
+  if (outer.dataset.beautyDraftContent !== "") outer.dataset.beautyDraftContent = "";
+  if (controls.dataset.beautyDraftControls !== "") controls.dataset.beautyDraftControls = "";
   let hero = draft.querySelector(".beauty-welcome");
   if (!hero) {
     hero = beautyElement("div", "beauty-welcome");
@@ -191,7 +184,7 @@ function beautyNativeSchemeSelect(controller, labels) {
   trigger.setAttribute('aria-label', '界面主题');
   trigger.setAttribute('aria-haspopup', 'listbox');
   trigger.setAttribute('aria-expanded', 'false');
-  trigger.insertAdjacentHTML('beforeend', '<span class="beauty-select-chevron">⌄</span>');
+  trigger.insertAdjacentHTML('beforeend', '<span class="beauty-select-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>');
   const values = ['system', 'light', 'dark'];
   let popup;
   const close = () => {
@@ -230,4 +223,12 @@ function beautyNativeSchemeSelect(controller, labels) {
   };
   createEffect(() => { const value=controller.current();trigger.dataset.value=value;trigger.firstElementChild.textContent=labels[value];for(const option of popup?.children||[])option.setAttribute('aria-selected',String(option.dataset.value===value)); });
   onCleanup(close); return trigger;
+}
+
+function beautySessionSummaryNative(s){return beautySessionSummary({id:s.id,title:s.title,projectID:s.projectID,location:{directory:s.location.directory,branch:s.location.branch},parentID:s.parentID,directory:s.location.directory,branch:s.location.branch,time:{created:s.time.created,archived:s.time.archived}});}
+function beautyNativeSessionStatus(button,session,conn,ctx){
+  if(!conn)return;
+  const status=nativeSessionStatus(()=>ServerConnection.key(conn),()=>session.id,()=>true,()=>ctx?.data.session.get(session.id)??session);
+  const indicator=beautyElement('span','beauty-session-status');button.prepend(indicator);
+  createEffect(()=>{const running=status.loading(),unread=status.unread();indicator.classList.toggle('beauty-running',running);indicator.classList.toggle('beauty-unread',!running&&unread);indicator.setAttribute('aria-label',running?'运行中':unread?'未读':'');const branch=ctx?.sync?.child(session.directory)?.[0]?.vcs?.branch||session.branch;button.title=[session.title||'新聊天',session.directory,branch].filter(Boolean).join('\n');});
 }

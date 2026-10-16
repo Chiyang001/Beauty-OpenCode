@@ -19,7 +19,7 @@ function beautyPresetInit(){
   const apply=nextMode=>{
     mode=nextMode;const root=document.documentElement;root.dataset.beautyPreset=selected;
     for(const key of keys){root.style.removeProperty(key);document.body.style.removeProperty(key);}
-    for(const key of ['--beauty-accent','--beauty-bubble','--beauty-wallpaper-shade'])root.style.removeProperty(key);
+    for(const key of ['--beauty-accent','--beauty-button-on-accent','--beauty-bubble','--beauty-wallpaper-shade'])root.style.removeProperty(key);
     const preset=presets.find(p=>p.id===selected);if(selected==='default')return;
     const [base,rail,surface,hover,border,muted,text,accent,bubble]=preset[mode];
     for(const key of keys){
@@ -31,6 +31,9 @@ function beautyPresetInit(){
       else{const level=(r+g+b)/3;color=level<27?base:level<34?rail:level<43?surface:level<57?hover:level<90?border:level<205?muted:text;}
       root.style.setProperty(key,color);
     }
+    const channels=[1,3,5].map(offset=>{const value=parseInt(accent.slice(offset,offset+2),16)/255;return value<=.04045?value/12.92:Math.pow((value+.055)/1.055,2.4);});
+    const luminance=channels[0]*.2126+channels[1]*.7152+channels[2]*.0722;
+    root.style.setProperty('--beauty-button-on-accent',luminance>.179?'#111111':'#ffffff');
     root.style.setProperty('--beauty-accent',accent);root.style.setProperty('--beauty-bubble',bubble);
     root.style.setProperty('--beauty-wallpaper-shade',mode==='light'?base+'b3':base+'99');
     window.api?.setBackgroundColor(rail);

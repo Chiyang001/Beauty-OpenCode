@@ -36,13 +36,14 @@ function discover(source) {
       label,
     ).node;
   const named = (keys, label) => fn(keys, label).id.name;
-  const context = (name) => {
+  const context = (name, marker) => {
     const entry = one(
       parsed.nodes.filter(
         ({ node }) =>
           node.type === "VariableDeclarator" &&
           node.id.type === "ObjectPattern" &&
           node.init?.type === "CallExpression" &&
+          (!marker || compact(node.init).includes(marker)) &&
           node.init.arguments[0]?.properties?.some(
             (p) =>
               p.key?.name === "name" &&
@@ -166,6 +167,9 @@ function discover(source) {
       onMount: onmount.id.name,
       onCleanup: cleanup,
       untrack,
+      // 2.0.30 uses unread(id, session) where 2.0.26 used unseenCount(id).
+      // Identify the controller by its shared notification and running-state APIs.
+      nativeSessionStatus: named(["notification.session.", "session.pending.list", "unread:", "loading:"], "session status"),
       useTheme: context("Theme"),
       useTabs: context("Tabs"),
       useLayout: context("Layout"),
@@ -183,6 +187,46 @@ function edits(source, changes) {
   for (const [start, end, value] of changes.sort((a, b) => b[0] - a[0]))
     source = source.slice(0, start) + value + source.slice(end);
   return source;
+}
+function localizePairing(source) {
+  const dictionaries = tree(source).nodes.filter(({ node }) =>
+    node.type === 'ObjectExpression' &&
+    node.properties.some(p => (p.key?.name ?? p.key?.value) === 'id' &&
+      (p.value?.value ?? p.value?.quasis?.[0]?.value.cooked) === 'pairing') &&
+    node.properties.some(p => (p.key?.name ?? p.key?.value) === 'i18n')
+  ).map(({ node }) => node.properties.find(p => (p.key?.name ?? p.key?.value) === 'i18n').value);
+  if (!dictionaries.length) return source; // Older versions do not have pairing.
+  if (dictionaries.length !== 1 || dictionaries[0].type !== 'ObjectExpression')
+    throw Error('配对语言包结构无法唯一识别');
+  const dictionary = dictionaries[0];
+  if (dictionary.properties.some(p => (p.key?.name ?? p.key?.value) === 'zh')) return source;
+  const zh = {
+    'command.title': '配对设备',
+    title: '配对',
+    description: '将其他设备连接到本机的 OpenCode 服务器。',
+    'pair.title': '配对设备',
+    'pair.description': '通过端到端加密隧道，随时随地连接手机、平板或其他电脑。',
+    'pair.open': '配对设备',
+    'pair.unavailable': '暂时无法使用配对功能。',
+    'dialog.description': '使用另一台设备上的 OpenCode 应用扫描二维码，或复制链接。',
+    'remote.title': '远程访问',
+    'remote.description': '已配对的设备可通过互联网访问本机的 OpenCode 服务器。关闭后将断开连接，需要重新配对才能再次访问。',
+    'remote.error': '无法更新远程访问设置，请重试。',
+    'setup.title': '正在设置远程访问…',
+    'setup.description': '这可能需要一分钟。',
+    'setup.error': '无法设置远程访问。',
+    retry: '重试',
+    'screenActive.title': '保持屏幕唤醒',
+    'screenActive.description': 'OpenCode 运行期间，防止本机屏幕进入休眠。',
+    'screenActive.error': '无法更新屏幕唤醒设置，请重试。',
+    qr: '配对二维码',
+    copyLink: '复制链接',
+    'copy.error': '无法复制配对信息，请重试。',
+    error: '无法更新配对信息，请重试。',
+    expires: '将在 {{time}} 后失效',
+    refresh: '刷新配对码',
+  };
+  return edits(source, [[dictionary.end - 1, dictionary.end - 1, ',zh:' + JSON.stringify(zh)]]);
 }
 function migrate(arc, pkg, html, script, style, source, asset, presets) {
   if (
@@ -257,7 +301,7 @@ function migrate(arc, pkg, html, script, style, source, asset, presets) {
   const liveEnd = shell.indexOf("    const records=", liveStart);
   shell =
     shell.slice(0, liveStart) +
-    "    if(ctx)for(const session of ctx.data.session.list())if(!session.parentID&&!session.time?.archived)live.push({session:{...session,directory:session.location.directory},projectName:ctx.projects.forSession(session)?.name||getFilename(session.location.directory)});\n" +
+    "    if(ctx)for(const session of ctx.data.session.list())if(!session.parentID&&!session.time?.archived)live.push({session:beautySessionSummaryNative(session),projectName:ctx.projects.forSession(session)?.name||getFilename(session.location.directory)});\n" +
     shell.slice(liveEnd);
   const deleteStart = shell.indexOf(
     "          const [store,setStore]=ctx.sync.child(s.directory);",
@@ -322,7 +366,7 @@ function migrate(arc, pkg, html, script, style, source, asset, presets) {
   // Tag the native shell frame once it exists; preserve all original window controls.
   shell = shell.replace(
     "const frame=main.firstElementChild;",
-    "const nativeFrame=main.parentElement.parentElement;nativeFrame.dataset.beautyNativeShell='';const frame=main.firstElementChild;",
+    "const nativeFrame=main.parentElement.parentElement;if(nativeFrame.dataset.beautyNativeShell!=='')nativeFrame.dataset.beautyNativeShell='';const frame=main.firstElementChild;",
   );
   let settings = asset("codex-settings.js")
     .toString()
@@ -338,6 +382,7 @@ function migrate(arc, pkg, html, script, style, source, asset, presets) {
   const bridge = asset("codex-native-bridge.js")
     .toString()
     .replace(/^\uFEFF/, "");
+  shell = shell.replace('row.append(button);beautySessionStatus(button,s,ctx);', 'row.append(button);beautyNativeSessionStatus(button,s,conn,ctx);');
   const aliases = Object.entries(bindings)
     .map(([k, v]) => `${k}=${v}`)
     .join(",");
@@ -367,7 +412,7 @@ function migrate(arc, pkg, html, script, style, source, asset, presets) {
   if (match.length !== 1) throw Error("垂直侧栏结构不匹配");
   changes.push([match[0].index, match[0].index + match[0][0].length, "false"]);
   const replacements = {
-    [script]: Buffer.from(edits(source, changes) + runtime),
+    [script]: Buffer.from(localizePairing(edits(source, changes)) + runtime),
     [style]: Buffer.concat([
       arc.read(style),
       Buffer.from("\n/* Beauty OpenCode native v2 full migration */\n"),
@@ -465,4 +510,4 @@ function migrate(arc, pkg, html, script, style, source, asset, presets) {
       });
   return { pkg, adapter: "native-v2", replacements, bindings };
 }
-module.exports = { tree, discover, migrate };
+module.exports = { tree, discover, migrate, localizePairing };
