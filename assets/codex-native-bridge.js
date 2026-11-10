@@ -1,5 +1,104 @@
 /* Native 2.x bridge. UI primitives are shared with the 1.x shell. */
+function beautyNativeModelName(button) {
+  return button?.querySelector('.truncate')?.textContent?.trim() || '选择模型';
+}
+function beautyNativeReasoningSlider(control) {
+  const [name, setName] = createSignal('选择模型');
+  let source, sourceWrapper, observer;
+  const trigger = beautyReasoningSlider(control, {
+    name,
+    open() {
+      const button = trigger.closest('[data-component="composer"]')?.querySelector('[data-action="composer-model"]');
+      button?.click();
+    },
+  });
+  const restore = () => {
+    sourceWrapper?.removeAttribute('data-beauty-model-source');
+    source = sourceWrapper = undefined;
+  };
+  const refresh = () => {
+    const button = trigger.closest('[data-component="composer"]')?.querySelector('[data-action="composer-model"]');
+    if (source !== button) {
+      restore();
+      source = button;
+      sourceWrapper = button?.closest('[data-component="tooltip-v2-trigger"]') || button;
+      if (sourceWrapper) sourceWrapper.dataset.beautyModelSource = '';
+    }
+    setName(beautyNativeModelName(button));
+  };
+  onMount(() => {
+    refresh();
+    const form = trigger.closest('[data-component="composer"]');
+    if (!form) return;
+    observer = new MutationObserver(refresh);
+    observer.observe(form, {childList: true, subtree: true, characterData: true});
+  });
+  onCleanup(() => { observer?.disconnect(); restore(); });
+  return trigger;
+}
+function beautyNativeComposerMount() {
+  let anchor, activeDialog, frame;
+  const position = () => {
+    frame = undefined;
+    for (const button of document.querySelectorAll('[data-action="composer-model"]'))
+      if (button.dataset.beautyModelButton !== '') button.dataset.beautyModelButton = '';
+    if (activeDialog && !activeDialog.isConnected) { activeDialog = anchor = undefined; }
+    if (!anchor?.isConnected) return;
+    const dialog = document.querySelector('.model-dialog[role="dialog"],[role="dialog"]:has([data-section="free-models"])');
+    if (!dialog) return;
+    activeDialog = dialog;
+    const root = dialog.closest('[data-component="dialog-v2"]');
+    if (!root) return;
+    if (root.dataset.beautyModelPopover !== '') root.dataset.beautyModelPopover = '';
+    const box = anchor.getBoundingClientRect(), width = Math.min(360, innerWidth - 16);
+    const above = box.top - 16, below = innerHeight - box.bottom - 16;
+    const up = above >= 160 || above >= below;
+    const height = Math.max(80, Math.min(440, up ? above : below));
+    const left = Math.max(8, Math.min(box.right - width, innerWidth - width - 8));
+    const top = up ? Math.max(8, box.top - height - 8) : box.bottom + 8;
+    for (const [key, value] of Object.entries({left, top, width, height})) {
+      const prop = '--beauty-model-' + key, next = value + 'px';
+      if (root.style.getPropertyValue(prop) !== next) root.style.setProperty(prop, next);
+    }
+    // Native dialog dimensions include important rules inside CSS layers.
+    // Inline important sizes keep both searchable and first-run pickers anchored.
+    const container = dialog.closest('[data-slot="dialog-container"]');
+    for (const [key, value] of Object.entries({width: width + 'px', height: height + 'px', 'min-width': '0px', 'min-height': '0px'}))
+      if (container?.style.getPropertyValue(key) !== value) container?.style.setProperty(key, value, 'important');
+    for (const [key, value] of Object.entries({width: '100%', height: '100%', 'min-width': '0px', 'min-height': '0px', 'max-width': '100%', 'max-height': '100%'}))
+      if (dialog.style.getPropertyValue(key) !== value) dialog.style.setProperty(key, value, 'important');
+    if (!dialog.classList.contains('model-dialog')) {
+      const body = dialog.querySelector('[data-slot="dialog-body"]');
+      for (const [key, value] of Object.entries({flex: '1 1 0%', 'min-height': '0px', 'max-height': 'none', 'overflow-y': 'auto'}))
+        if (body?.style.getPropertyValue(key) !== value) body?.style.setProperty(key, value, 'important');
+    }
+  };
+  const schedule = () => { if (frame === undefined) frame = requestAnimationFrame(position); };
+  const click = event => {
+    const button = event.target.closest?.('[data-action="composer-model"]');
+    if (!button) return;
+    anchor = button.closest('[data-component="composer"]')?.querySelector('.beauty-composer-trigger') || button;
+    activeDialog = undefined;
+    schedule();
+  };
+  const observer = new MutationObserver(schedule);
+  observer.observe(document.body, {childList: true, subtree: true});
+  document.addEventListener('click', click, true);
+  window.addEventListener('resize', schedule);
+  document.addEventListener('scroll', schedule, true);
+  schedule();
+  return () => {
+    observer.disconnect();
+    document.removeEventListener('click', click, true);
+    window.removeEventListener('resize', schedule);
+    document.removeEventListener('scroll', schedule, true);
+    if (frame !== undefined) cancelAnimationFrame(frame);
+  };
+}
 async function beautyNativeExportSession(sessions, layout, command, session) {
+  // 2.2 exposes export on the home controller; it also handles unopened sessions.
+  if (typeof sessions.session.export === 'function')
+    return sessions.session.export(sessions.session.server?.(), session);
   const current = () => { const route = layout.route(); return route.sessionId || route.id; };
   if (current() !== session.id) sessions.session.open(session);
   for (let attempt = 0; attempt < 180; attempt++) {
@@ -22,6 +121,13 @@ function beautyNativeSessions(home) {
   });
   return {
     ...native,
+    session: {
+      ...native.session,
+      server: () => {
+        const conn = home.server.focused();
+        return conn ? ServerConnection.key(conn) : native.session.server?.();
+      },
+    },
     data: {
       ...native.data,
       searchRecords: () => native.data.searchRecords().map(normalize),
@@ -78,8 +184,11 @@ function beautyNativeDecorateSettings(navigate) {
   search.type = "search";
   search.placeholder = "搜索设置";
   search.setAttribute("aria-label", "搜索设置");
-  header.append(nativeSearch || search);
+  // Keep native search in its Solid-owned location: 2.2 searches all settings
+  // through an indexed results view, including pages that are not mounted yet.
+  if (!nativeSearch) header.append(search);
   nav.prepend(header);
+  if (nativeSearch) return;
   const filter = () => {
     const q = search.value.trim().toLowerCase();
     for (const row of screen.querySelectorAll(
@@ -119,8 +228,19 @@ function beautyNativeDecorateDraft(main, tabs, layout) {
   if (!wordmark || !form) return;
   if (draft.dataset.beautyDraft !== "") draft.dataset.beautyDraft = "";
   wordmark.hidden = true;
-  const controls = form.parentElement.parentElement.parentElement;
-  const outer = controls.parentElement.parentElement;
+  const slot = form.closest('[data-slot="new-session-composer"]');
+  let content = wordmark.parentElement;
+  while (content && content !== draft && !content.contains(form))
+    content = content.parentElement;
+  if (!content || content === draft) return;
+  const outer = content.parentElement;
+  let controls = slot;
+  if (!controls) {
+    controls = form;
+    while (controls.parentElement && controls.parentElement !== content)
+      controls = controls.parentElement;
+  }
+  if (!outer || outer === draft || !draft.contains(outer)) return;
   if (outer.dataset.beautyDraftContent !== "") outer.dataset.beautyDraftContent = "";
   if (controls.dataset.beautyDraftControls !== "") controls.dataset.beautyDraftControls = "";
   let hero = draft.querySelector(".beauty-welcome");
@@ -178,6 +298,25 @@ function beautyNativeHome() {
     },
   };
 }
+function beautyNativeTimelineSource(home, layout, navigate, location) {
+  return {
+    read() {
+      const route = layout.route(), id = route.sessionId || route.id;
+      if (!id) return {key: '', messages: []};
+      const conn = home.server.list().find(item => ServerConnection.key(item) === route.server) || home.server.focused();
+      const ctx = conn && home.server.context(conn);
+      const messages = ctx?.data?.session?.message?.list(id) || [];
+      return {
+        key: (conn ? ServerConnection.key(conn) : '') + ':' + id,
+        messages: messages.filter(message => message.type === 'user').map(message => ({id: message.id, text: message.text || ''})),
+      };
+    },
+    reveal(id) {
+      // The native hash handler reveals virtual rows and loads older pages.
+      navigate(location.pathname + location.search + '#message-' + encodeURIComponent(id), {replace: true});
+    },
+  };
+}
 function beautyNativeSchemeSelect(controller, labels) {
   const trigger = beautyButton('', '', () => toggle(), 'beauty-select-trigger');
   trigger.dataset.action = 'beauty-color-scheme';
@@ -225,10 +364,10 @@ function beautyNativeSchemeSelect(controller, labels) {
   onCleanup(close); return trigger;
 }
 
-function beautySessionSummaryNative(s){return beautySessionSummary({id:s.id,title:s.title,projectID:s.projectID,location:{directory:s.location.directory,branch:s.location.branch},parentID:s.parentID,directory:s.location.directory,branch:s.location.branch,time:{created:s.time.created,archived:s.time.archived}});}
+function beautySessionSummaryNative(s){return beautySessionSummary({id:s.id,title:s.title,projectID:s.projectID,location:{...s.location},parentID:s.parentID,directory:s.location.directory,branch:s.location.branch,time:{created:s.time.created,archived:s.time.archived}});}
 function beautyNativeSessionStatus(button,session,conn,ctx){
   if(!conn)return;
   const status=nativeSessionStatus(()=>ServerConnection.key(conn),()=>session.id,()=>true,()=>ctx?.data.session.get(session.id)??session);
   const indicator=beautyElement('span','beauty-session-status');button.prepend(indicator);
-  createEffect(()=>{const running=status.loading(),unread=status.unread();indicator.classList.toggle('beauty-running',running);indicator.classList.toggle('beauty-unread',!running&&unread);indicator.setAttribute('aria-label',running?'运行中':unread?'未读':'');const branch=ctx?.sync?.child(session.directory)?.[0]?.vcs?.branch||session.branch;button.title=[session.title||'新聊天',session.directory,branch].filter(Boolean).join('\n');});
+  createEffect(()=>{const running=status.loading(),unread=status.unread();indicator.classList.toggle('beauty-running',running);indicator.classList.toggle('beauty-unread',!running&&unread);indicator.setAttribute('aria-label',running?'运行中':unread?'未读':'');const branch=ctx?.data?.location?.vcs?.info(session.location)?.branch?.current||ctx?.sync?.child?.(session.directory)?.[0]?.vcs?.branch||session.branch;button.title=[session.title||'新聊天',session.directory,branch].filter(Boolean).join('\n');});
 }

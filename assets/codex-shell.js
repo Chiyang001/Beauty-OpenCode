@@ -39,56 +39,123 @@ function beautyWordmark() {
   mark.querySelectorAll('[opacity]').forEach(node=>node.removeAttribute('opacity'));
   return mark;
 }
-function beautyReasoningSlider(control){
+function beautyReasoningSlider(control,model){
   const label=value=>({default:'默认',none:'无',minimal:'最低',low:'轻度',medium:'中等',high:'高',xhigh:'极高',max:'最高'}[value]||value);
-  const trigger=beautyButton('思考强度','',()=>toggle());trigger.classList.add('beauty-reasoning-trigger');trigger.setAttribute('aria-haspopup','dialog');const arrow=beautyElement('span','beauty-reasoning-arrow');arrow.innerHTML=beautyIcon('chevron');trigger.append(arrow);
-  let popup,range,title,track,particles;
-  const close=()=>{popup?.remove();popup=undefined;trigger.setAttribute('aria-expanded','false');document.removeEventListener('pointerdown',outside,true);document.removeEventListener('keydown',keys,true);};
+  const trigger=beautyButton(model?'模型与思考强度':'思考强度','',()=>toggle());
+  trigger.classList.add('beauty-reasoning-trigger');trigger.setAttribute('aria-haspopup','dialog');
+  const strength=trigger.firstElementChild;strength.className='beauty-composer-strength';
+  let modelName;
+  if(model){trigger.classList.add('beauty-composer-trigger');modelName=beautyElement('span','beauty-composer-model');trigger.prepend(modelName);}
+  const arrow=beautyElement('span','beauty-reasoning-arrow');arrow.innerHTML=beautyIcon('chevron');trigger.append(arrow);
+  let popup,range,title,track,ticks,particles,modelLink,modelText;
+  const close=()=>{
+    popup?.remove();popup=range=title=track=ticks=particles=modelLink=modelText=undefined;
+    trigger.setAttribute('aria-expanded','false');
+    document.removeEventListener('pointerdown',outside,true);document.removeEventListener('keydown',keys,true);
+    window.removeEventListener('resize',position);document.removeEventListener('scroll',reposition,true);
+  };
+  const position=()=>{
+    if(!popup)return;const box=trigger.getBoundingClientRect();
+    popup.style.left=Math.max(8,Math.min(box.right-popup.offsetWidth,innerWidth-popup.offsetWidth-8))+'px';
+    popup.style.top=Math.max(8,box.top-popup.offsetHeight-8)+'px';
+  };
+  const reposition=event=>{if(!popup?.contains(event.target))position();};
   const outside=e=>{if(!popup?.contains(e.target)&&!trigger.contains(e.target))close();};
-  const keys=e=>{if(e.key==='Escape'){close();trigger.focus();}};
-  const refresh=()=>{const options=control.options(),current=control.current(),index=Math.max(0,options.findIndex(option=>option.id===current));trigger.firstElementChild.textContent=label(current);if(range){range.max=String(options.length-1);range.value=String(index);range.setAttribute('aria-valuetext',label(current));title.textContent=label(current);popup?.classList.toggle('beauty-reasoning-ultra',options.length>1&&index===options.length-1);const ratio=options.length>1?index/(options.length-1):0;track.style.setProperty('--beauty-range-progress',ratio*100+'%');track.style.setProperty('--beauty-range-ratio',String(ratio));particles.style.opacity=ratio>0?'1':'0';}};
+  const keys=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close();trigger.focus();}};
+  const refresh=()=>{
+    const options=control.options(),current=control.current(),index=Math.max(0,options.findIndex(option=>option.id===current));
+    strength.textContent=label(current);
+    if(modelName){
+      const name=model.name();modelName.textContent=name;
+      trigger.setAttribute('aria-label',name+'，'+label(current)+'，选择模型与思考强度');
+      if(modelText){modelText.textContent=name;modelLink.setAttribute('aria-label',label(current)+'，'+name+'，选择模型');}
+    }
+    if(!range)return;
+    range.max=String(Math.max(0,options.length-1));range.value=String(index);
+    range.setAttribute('aria-valuetext',label(current));title.textContent=label(current);
+    [...ticks.children].forEach((tick,i)=>tick.classList.toggle('beauty-reasoning-covered',i<=index));
+    popup.classList.toggle('beauty-reasoning-ultra',options.length>1&&index===options.length-1);
+    const ratio=options.length>1?index/(options.length-1):0;
+    track.style.setProperty('--beauty-range-progress',ratio*100+'%');track.style.setProperty('--beauty-range-ratio',String(ratio));
+    particles.style.opacity=ratio>0?'1':'0';
+  };
   const toggle=()=>{
-    if(popup){close();return;}popup=beautyElement('div','beauty-reasoning-panel');popup.setAttribute('role','dialog');popup.setAttribute('aria-label','调整思考强度');
-    title=beautyElement('strong','beauty-reasoning-title');popup.append(title);
-    range=beautyElement('input','beauty-reasoning-range');range.type='range';range.min='0';range.step='1';range.setAttribute('aria-label','思考强度');range.addEventListener('input',()=>{const option=control.options()[Number(range.value)];if(option)control.onSelect(option.id);refresh();});track=beautyElement('div','beauty-reasoning-track');track.append(beautyElement('div','beauty-reasoning-fill'));const ticks=beautyElement('div','beauty-reasoning-dots');ticks.setAttribute('aria-hidden','true');for(const option of control.options())ticks.append(beautyElement('span'));particles=beautyElement('div','beauty-reasoning-particles');particles.setAttribute('aria-hidden','true');for(let i=0;i<20;i++){const dot=beautyElement('span','beauty-reasoning-particle');const duration=1.1+(i%4)*.225;dot.style.top=(6+(i*7)%17)+'px';dot.style.width=dot.style.height=(2.2+(i%3)*.8)+'px';dot.style.animationDuration=duration+'s';dot.style.animationDelay=(-i*.185)+'s';particles.append(dot);}track.append(ticks,particles,beautyElement('div','beauty-reasoning-thumb'),range);popup.append(track);document.body.append(popup);refresh();
-    const box=trigger.getBoundingClientRect();popup.style.left=Math.max(8,Math.min(box.right-popup.offsetWidth,innerWidth-popup.offsetWidth-8))+'px';popup.style.top=Math.max(8,box.top-popup.offsetHeight-8)+'px';trigger.setAttribute('aria-expanded','true');document.addEventListener('pointerdown',outside,true);document.addEventListener('keydown',keys,true);range.focus();
+    if(popup){close();return;}
+    popup=beautyElement('div','beauty-reasoning-panel');popup.setAttribute('role','dialog');popup.setAttribute('aria-label','调整思考强度');
+    title=beautyElement('strong','beauty-reasoning-title');
+    if(model){
+      popup.classList.add('beauty-composer-reasoning');
+      modelLink=beautyButton('选择模型','',()=>{close();model.open(trigger);},'beauty-reasoning-model');
+      const caption=modelLink.firstElementChild;caption.className='beauty-reasoning-model-caption';
+      modelText=beautyElement('span','beauty-reasoning-model-name');
+      const chevron=beautyElement('span','beauty-reasoning-model-chevron');chevron.innerHTML=beautyIcon('chevron');
+      caption.replaceChildren(modelText,chevron);modelLink.prepend(title);popup.append(modelLink);
+      const reset=beautyButton('恢复默认思考强度','reset',()=>{
+        const options=control.options(),option=options.find(item=>item.id==='default')||options[0];
+        if(option)control.onSelect(option.id);refresh();
+      },'beauty-icon-only beauty-reasoning-reset');
+      popup.append(reset);
+    }else popup.append(title);
+    range=beautyElement('input','beauty-reasoning-range');range.type='range';range.min='0';range.step='1';range.setAttribute('aria-label','思考强度');
+    range.addEventListener('input',()=>{const option=control.options()[Number(range.value)];if(option)control.onSelect(option.id);refresh();});
+    track=beautyElement('div','beauty-reasoning-track');track.append(beautyElement('div','beauty-reasoning-fill'));
+    ticks=beautyElement('div','beauty-reasoning-dots');ticks.setAttribute('aria-hidden','true');
+    for(const option of control.options())ticks.append(beautyElement('span'));
+    particles=beautyElement('div','beauty-reasoning-particles');particles.setAttribute('aria-hidden','true');
+    // Seed an irregular stream immediately, with varied sizes, lanes and speeds.
+    const noise=n=>{const value=Math.sin(n*127.1+311.7)*43758.5453;return value-Math.floor(value);};
+    for(let i=0;i<14;i++){
+      const dot=beautyElement('span','beauty-reasoning-particle'),duration=2.7+noise(i+8)*1.1;
+      const phase=(i+noise(i+31)*.9)/14;
+      dot.style.top=(4+noise(i+61)*19)+'px';dot.style.width=dot.style.height=(1.5+noise(i+93)*1.7)+'px';
+      dot.style.animationDuration=duration+'s';dot.style.animationDelay=(-phase*duration)+'s';particles.append(dot);
+    }
+    track.append(ticks,particles,beautyElement('div','beauty-reasoning-thumb'),range);popup.append(track);document.body.append(popup);refresh();position();
+    trigger.setAttribute('aria-expanded','true');document.addEventListener('pointerdown',outside,true);document.addEventListener('keydown',keys,true);
+    window.addEventListener('resize',position);document.addEventListener('scroll',reposition,true);range.focus();
   };
   createEffect(refresh);onCleanup(close);return trigger;
 }
-function beautyTimelineMount(){
+function beautyTimelineMount(nativeSource){
   const rail=beautyElement('nav','beauty-timeline');rail.setAttribute('aria-label','对话快速定位');document.body.append(rail);
-  let items=[],offsets=[],dirty=true,viewport,frame,mutationTimer,lastScroll,selectedID,hoverIndex=-1;
+  let items=[],offsets=[],dirty=true,viewport,frame,mutationTimer,lastScroll,selectedID,hoverIndex=-1,nativeState,sessionKey,disposed=false;
   const wave=index=>{hoverIndex=index;[...rail.children].forEach((button,i)=>{const distance=Math.abs(i-index);const strength=index<0?0:Math.max(0,1-distance/4);button.style.setProperty('--beauty-mark-width',(8+24*strength*strength)+'px');button.style.setProperty('--beauty-mark-opacity',String(.35+.65*strength));});};
   const manualScroll=event=>{if(viewport?.contains(event.target)&&(!event.key||['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(event.key))){selectedID=undefined;schedule();}};
   const update=()=>{
     frame=undefined;
     if(dirty){dirty=false;
-    const seen=new Set();const next=[...document.querySelectorAll('#root [data-timeline-row="UserMessage"][data-message-id]')].filter(node=>{if(!node.getClientRects().length||seen.has(node.dataset.messageId))return false;seen.add(node.dataset.messageId);return true;});
-    viewport=next[0]?.closest('.scroll-view__viewport');
-    if(!viewport&&next[0]){let node=next[0].parentElement;while(node){if(/auto|scroll/.test(getComputedStyle(node).overflowY)){viewport=node;break;}node=node.parentElement;}}
+    const seen=new Set();const mounted=[...document.querySelectorAll('#root [data-timeline-row="UserMessage"][data-message-id]')].filter(node=>{if(!node.getClientRects().length||seen.has(node.dataset.messageId))return false;seen.add(node.dataset.messageId);return true;});
+    const virtual=!!nativeState?.key&&!!document.querySelector('#root [data-timeline-virtual-content]');
+    if(sessionKey!==nativeState?.key){sessionKey=nativeState?.key;selectedID=undefined;}
+    const byID=new Map(mounted.map(node=>[node.dataset.messageId,node]));
+    const next=virtual?nativeState.messages.map(message=>({...message,node:byID.get(message.id)})):mounted.map(node=>({id:node.dataset.messageId,text:node.textContent,node}));
+    viewport=mounted[0]?.closest('.scroll-view__viewport');
+    if(!viewport&&mounted[0]){let node=mounted[0].parentElement;while(node){if(/auto|scroll/.test(getComputedStyle(node).overflowY)){viewport=node;break;}node=node.parentElement;}}
+    if(!viewport&&virtual)viewport=document.querySelector('#root [data-slot="session-timeline-scroll"] > .scroll-view__viewport');
     rail.hidden=!viewport||!next.length;if(rail.hidden)return;
     const box=viewport.getBoundingClientRect();rail.style.left=(box.left+8)+'px';rail.style.top=(box.top+box.height*.5)+'px';rail.style.maxHeight=Math.max(80,box.height-80)+'px';
-    if(next.length!==items.length||next.some((node,i)=>node!==items[i])){
+    if(next.length!==items.length||next.some((item,i)=>item.id!==items[i].id||item.text!==items[i].text)){
       items=next;rail.replaceChildren();
-      items.forEach((node,i)=>{const button=beautyElement('button','beauty-timeline-mark');button.type='button';button.setAttribute('aria-label','跳转到第 '+(i+1)+' 轮对话');
-        const preview=beautyElement('span','beauty-timeline-preview');preview.textContent=(node.textContent||'第 '+(i+1)+' 轮对话').trim().slice(0,240);button.append(preview);
+      items.forEach((item,i)=>{const button=beautyElement('button','beauty-timeline-mark');button.type='button';button.setAttribute('aria-label','跳转到第 '+(i+1)+' 轮对话');
+        const preview=beautyElement('span','beauty-timeline-preview');preview.textContent=(item.text||'第 '+(i+1)+' 轮对话').trim().slice(0,240);button.append(preview);
         button.addEventListener('pointerenter',()=>wave(i));button.addEventListener('focus',()=>wave(i));button.addEventListener('blur',()=>wave(-1));
-        button.addEventListener('click',()=>{selectedID=node.dataset.messageId;const offset=node.getBoundingClientRect().top-viewport.getBoundingClientRect().top+viewport.scrollTop-32;viewport.scrollTo({top:offset,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});schedule();});rail.append(button);
+        button.addEventListener('click',()=>{selectedID=item.id;if(virtual){nativeSource.reveal(item.id);schedule();return;}const node=document.querySelector('#root [data-timeline-row="UserMessage"][data-message-id="'+CSS.escape(item.id)+'"]');if(!node||!viewport)return;const offset=node.getBoundingClientRect().top-viewport.getBoundingClientRect().top+viewport.scrollTop-32;viewport.scrollTo({top:offset,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});schedule();});rail.append(button);
       });
       wave(hoverIndex);
     }
-    offsets=items.map(node=>node.getBoundingClientRect().top-box.top+viewport.scrollTop);
+    offsets=next.map(item=>item.node?item.node.getBoundingClientRect().top-box.top+viewport.scrollTop:undefined);
     }
     if(rail.hidden||!viewport)return;
-    let active=items.findIndex(node=>node.dataset.messageId===selectedID);
+    let active=items.findIndex(item=>item.id===selectedID);
     if(active<0){active=0;offsets.forEach((offset,i)=>{if(offset<=viewport.scrollTop+34)active=i;});}
     [...rail.children].forEach((button,i)=>{button.classList.toggle('beauty-timeline-active',i===active);if(i===active)button.setAttribute('aria-current','true');else button.removeAttribute('aria-current');});
   };
   const schedule=()=>{if(frame===undefined)frame=requestAnimationFrame(update);};
+  if(nativeSource)createEffect(()=>{nativeState=nativeSource.read();if(!disposed){dirty=true;schedule();}});
   rail.addEventListener('pointerleave',()=>wave(-1));
   for(const event of ['wheel','touchstart','pointerdown','keydown'])document.addEventListener(event,manualScroll,true);
   const observer=new MutationObserver(()=>{if(mutationTimer!==undefined)return;mutationTimer=setTimeout(()=>{mutationTimer=undefined;dirty=true;schedule();},120);});observer.observe(document.getElementById('root'),{childList:true,subtree:true});const scroll=()=>{if(viewport&&viewport.scrollTop!==lastScroll){lastScroll=viewport.scrollTop;schedule();}};document.addEventListener('scroll',scroll,true);const resized=()=>{dirty=true;schedule();};window.addEventListener('resize',resized);schedule();
-  return ()=>{observer.disconnect();clearTimeout(mutationTimer);document.removeEventListener('scroll',scroll,true);window.removeEventListener('resize',resized);for(const event of ['wheel','touchstart','pointerdown','keydown'])document.removeEventListener(event,manualScroll,true);if(frame!==undefined)cancelAnimationFrame(frame);rail.remove();};
+  return ()=>{disposed=true;observer.disconnect();clearTimeout(mutationTimer);document.removeEventListener('scroll',scroll,true);window.removeEventListener('resize',resized);for(const event of ['wheel','touchstart','pointerdown','keydown'])document.removeEventListener(event,manualScroll,true);if(frame!==undefined)cancelAnimationFrame(frame);rail.remove();};
 }
 function BeautyHome() {
   const home=createHomeController(); const projects=createHomeProjectsController(home);
@@ -132,9 +199,7 @@ function createBeautyShell() {
       const ctx=home.server.focusedContext();if(!ctx||!conn)return;
       const name=projectNames()[project.worktree]||project.name||getFilename(project.worktree);
       beautyConfirmDelete(name,async()=>{
-        await beautyDeleteProjectSessions(ctx,project,ServerConnection.key(conn));
-        for(let i=tabs.store.length-1;i>=0;i--){const tab=tabs.store[i];if(tab.type==='draft'&&tab.server===ServerConnection.key(conn)&&beautyProjectContains(project,tab.directory))tabs.closeTab(i);}
-        projects.project.close(conn,project.worktree);
+        await beautyRemoveProject(ctx,project,conn,tabs,projects);
         const nextPins=projectPins().filter(path=>path!==project.worktree);localStorage.setItem('beauty.projectPins',JSON.stringify(nextPins));setProjectPins(nextPins);
         const nextNames={...projectNames()};delete nextNames[project.worktree];localStorage.setItem('beauty.projectNames',JSON.stringify(nextNames));setProjectNames(nextNames);
       },'移除项目','确定移除项目“'+name+'”并永久删除项目下的所有对话和草稿吗？此操作无法撤销。项目文件夹和代码文件将保留。');
@@ -172,7 +237,8 @@ function createBeautyShell() {
     toggle.setAttribute('aria-expanded',String(!closed));toggle.classList.toggle('beauty-section-open',!closed);heading.append(toggle);return heading;
   };
   const [menu,setMenu]=createSignal(null);
-  let removeTimeline;onMount(()=>{removeTimeline=beautyTimelineMount();});onCleanup(()=>removeTimeline?.());
+  let removeTimeline;onMount(()=>{removeTimeline=beautyTimelineMount(typeof beautyNativeTimelineSource==='function'?beautyNativeTimelineSource(home,layout,navigate,location):undefined);});onCleanup(()=>removeTimeline?.());
+  let removeComposer;onMount(()=>{if(typeof beautyNativeComposerMount==='function')removeComposer=beautyNativeComposerMount();});onCleanup(()=>removeComposer?.());
   const shell=beautyElement('aside','beauty-shell'); shell.id='beauty-shell';
   const rail=beautyElement('nav','beauty-rail'); rail.setAttribute('aria-label','主导航');
   const startNew=()=>{setRecent(false);home.project.openNewSession();};
@@ -284,6 +350,7 @@ function createBeautyShell() {
         button.title=project.worktree;row.append(button);
         const fold=beautyButton(folds.has(project.worktree)?'展开聊天':'折叠聊天','chevron',toggleProject,'beauty-icon-only beauty-fold');fold.classList.toggle('beauty-fold-open',!folds.has(project.worktree));row.append(fold);list.append(row);
         const more=beautyButton('项目菜单','more',()=>openProjectMenu(more,project,conn),'beauty-icon-only beauty-project-more');more.setAttribute('aria-haspopup','menu');more.setAttribute('aria-expanded','false');row.append(more);
+        row.addEventListener('contextmenu',event=>{event.preventDefault();openProjectMenu(more,project,conn);});
         const childrenStart=list.children.length;
         const drafts=tabs.store.filter(t=>t.type==='draft' && beautyProjectContains(project,t.directory) && (!conn || t.server===ServerConnection.key(conn)));
         for(const draft of drafts){
@@ -421,6 +488,18 @@ function beautyMergeSessions(indexed,live,removed,keyFor){
   return [...new Map([...indexed,...live].map(record=>[record.session.id,record])).values()]
     .filter(record=>!removed.has(keyFor(record.session.id)))
     .sort((a,b)=>(b.session.time?.created||0)-(a.session.time?.created||0)||a.session.id.localeCompare(b.session.id));
+}
+async function beautyRemoveProject(ctx,project,conn,tabs,projects){
+  if(typeof projects.project.hide!=='function'&&typeof projects.project.close!=='function')throw Error('无法识别项目移除接口');
+  const server=ServerConnection.key(conn);
+  await beautyDeleteProjectSessions(ctx,project,server);
+  for(let i=tabs.store.length-1;i>=0;i--){
+    const tab=tabs.store[i];
+    if(tab.type==='draft'&&tab.server===server&&beautyProjectContains(project,tab.directory))tabs.closeTab(i);
+  }
+  // Native 2.x hide consumes a project object; legacy close consumes its path.
+  if(typeof projects.project.hide==='function')await projects.project.hide(conn,project);
+  else await projects.project.close(conn,project.worktree);
 }
 async function beautyDeleteProjectSessions(ctx,project,server){
   const directories=[...new Map([project.worktree,...project.sandboxes||[]].map(path=>[pathKey(path),path])).values()];

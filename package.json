@@ -1,6 +1,6 @@
 {
   "name": "beauty-opencode",
-  "version": "3.1.5",
+  "version": "3.1.11",
   "private": true,
   "description": "OpenCode desktop layout switcher",
   "main": "electron/main.cjs",
@@ -8,8 +8,9 @@
     "start": "electron .",
     "build:icon": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-icon.ps1",
     "build": "npm run build:icon && electron-builder --win portable",
-    "test": "node --test electron/patch.test.cjs electron/native-v2.test.cjs",
-    "test:ui": "electron electron/ui-regression.cjs"
+    "test": "node --test electron/patch.test.cjs electron/native-v2.test.cjs electron/native-discovery.test.cjs electron/native-220.test.cjs electron/chinese-locale.test.cjs",
+    "test:ui": "electron electron/ui-regression.cjs && electron electron/v220-style.test.cjs",
+    "test:native-ui": "node electron/native-ui-regression.cjs"
   },
   "devDependencies": {
     "electron": "^40.0.0",

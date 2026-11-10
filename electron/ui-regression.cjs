@@ -37,7 +37,7 @@ app.whenReady().then(async () => {
       <div id="pending" data-slot="user-message-body" data-pending>Pending</div>
       <div data-component="collapsed-tool-group"><div data-component="collapsible" class="tool-collapsible"><button id="thoughtSummary" data-slot="collapsible-trigger" aria-expanded="true">使用了 1 个思考</button></div></div>
       <div class="beauty-reasoning-title" id="strength">High</div>
-      <div class="beauty-reasoning-dots"><span id="dot"></span></div>
+      <div class="beauty-reasoning-dots"><span id="dot"></span></div><div class="beauty-reasoning-particle" id="bubbleParticle"></div>
       <aside class="beauty-shell"><nav class="beauty-rail"></nav><section class="beauty-sidebar">
       <div class="beauty-sidebar-list">Sessions</div></section><div class="beauty-sidebar-resize" hidden></div></aside>
       </body></html>`));
@@ -79,6 +79,14 @@ app.whenReady().then(async () => {
     })()`);
     assert(themedButton.background.includes('rgb(229, 149, 181)'), 'Native contrast button follows the selected accent');
     assert.equal(themedButton.color,'rgb(17, 17, 17)', 'Light accents support a readable dark foreground');
+    const drift = await win.webContents.executeJavaScript(`(() => {
+      const node=document.getElementById('bubbleParticle'),animation=node.getAnimations()[0];
+      const css=getComputedStyle(node);const result={timing:css.animationTimingFunction,duration:parseFloat(css.animationDuration),opacity:[],left:[]};
+      animation.pause();for(const time of [250,750,1250]){animation.currentTime=time;const frame=getComputedStyle(node);result.opacity.push(Number(frame.opacity));result.left.push(parseFloat(frame.left));}return result;
+    })()`);
+    assert.equal(drift.timing,'linear');assert(drift.duration>=2.5&&drift.duration<=3.5,'Bubbles use a moderate drift');
+    assert(Math.max(...drift.opacity)-Math.min(...drift.opacity)<.01,'Bubble opacity stays steady');
+    assert(Math.abs((drift.left[0]-drift.left[1])-(drift.left[1]-drift.left[2]))<1,'Bubble motion has no acceleration spike');
     for (const width of [240, 312, 600]) {
       const size = await win.webContents.executeJavaScript(`(() => {
         document.body.style.setProperty('--beauty-sidebar-width','${width}px');
@@ -90,6 +98,54 @@ app.whenReady().then(async () => {
     }
     await win.webContents.executeJavaScript(fs.readFileSync(path.join(__dirname, '..', 'assets', 'codex-shell.js'), 'utf8'));
     await win.webContents.executeJavaScript(fs.readFileSync(path.join(__dirname, '..', 'assets', 'codex-native-bridge.js'), 'utf8'));
+    const reasoning = await win.webContents.executeJavaScript(`(() => {
+      window.createEffect=fn=>fn();window.onCleanup=()=>{};
+      let selected='high',opened=0;const values=['default','low','high','max'];
+      const control={options:()=>values.map(id=>({id})),current:()=>selected,onSelect:id=>{selected=id;}};
+      const trigger=beautyReasoningSlider(control,{name:()=> 'GPT-6.1 Sol',open:()=>opened++});document.body.append(trigger);
+      const entryPanels=[];
+      for(const selector of ['.beauty-composer-model','.beauty-composer-strength','.beauty-reasoning-arrow']){
+        trigger.querySelector(selector).click();entryPanels.push(!!document.querySelector('.beauty-reasoning-range')&&opened===0);
+        document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+      }
+      trigger.querySelector('.beauty-composer-strength').click();
+      let popup=document.querySelector('.beauty-reasoning-panel');
+      const title=popup.querySelector('.beauty-reasoning-title'),caption=popup.querySelector('.beauty-reasoning-model-caption');
+      const oneButton=title.closest('button')===caption.closest('button');
+      const icons=popup.querySelectorAll('.beauty-reasoning-symbol,.beauty-composer-lightning').length+trigger.querySelectorAll('.beauty-composer-lightning').length;
+      const ticks=[...popup.querySelectorAll('.beauty-reasoning-dots span')],range=popup.querySelector('input');
+      const covered=ticks.map(n=>getComputedStyle(n).visibility),before=ticks.map(n=>n.getBoundingClientRect().left);
+      range.value='1';range.dispatchEvent(new Event('input'));const lower=ticks.map(n=>getComputedStyle(n).visibility);
+      const after=ticks.map(n=>n.getBoundingClientRect().left);
+      range.value='3';range.dispatchEvent(new Event('input'));const highest=ticks.map(n=>getComputedStyle(n).visibility);
+      range.value='2';range.dispatchEvent(new Event('input'));
+      const particles=[...popup.querySelectorAll('.beauty-reasoning-particle')],clip=popup.querySelector('.beauty-reasoning-particles');
+      const animations=particles.map(n=>n.getAnimations()[0]);animations.forEach(a=>a.pause());
+      let minimum=Infinity,maxGap=0;
+      for(let time=0;time<=6400;time+=80){
+        animations.forEach(a=>{a.currentTime=time;});const box=clip.getBoundingClientRect();
+        const positions=particles.map(n=>n.getBoundingClientRect()).filter(r=>r.right>box.left&&r.left<box.right).map(r=>Math.max(0,r.left-box.left)).sort((a,b)=>a-b);
+        minimum=Math.min(minimum,positions.length);const points=[0,...positions,box.width];
+        for(let i=1;i<points.length;i++)maxGap=Math.max(maxGap,points[i]-points[i-1]);
+      }
+      const streamWidth=clip.getBoundingClientRect().width;
+      title.click();const titleOpened=opened===1&&!document.querySelector('.beauty-reasoning-panel');
+      trigger.querySelector('.beauty-composer-strength').click();
+      document.querySelector('.beauty-reasoning-model-caption').click();const captionOpened=opened===2&&!document.querySelector('.beauty-reasoning-panel');
+      const native=document.createElement('button');native.dataset.beautyModelButton='';native.textContent='Big Pickle';document.body.append(native);
+      const prefix=getComputedStyle(native,'::before').content;native.remove();
+      const tip=document.createElement('div');tip.dataset.component='new-session-tip';tip.textContent='75 providers';document.body.append(tip);
+      const tipDisplay=getComputedStyle(tip).display;tip.remove();trigger.remove();
+      return {entryPanels,oneButton,icons,covered,lower,highest,before,after,minimum,maxGap,streamWidth,titleOpened,captionOpened,prefix,tipDisplay};
+    })()`);
+    assert(reasoning.oneButton&&reasoning.titleOpened&&reasoning.captionOpened,'Both header lines share one clickable model control');
+    assert.deepEqual(reasoning.entryPanels,[true,true,true],'Model name, strength and arrow all open the reasoning panel');
+    assert.equal(reasoning.icons,0);assert.equal(reasoning.prefix,'none');assert.equal(reasoning.tipDisplay,'none');
+    assert.deepEqual(reasoning.covered,['hidden','hidden','hidden','visible']);
+    assert.deepEqual(reasoning.lower,['hidden','hidden','visible','visible']);
+    assert.deepEqual(reasoning.highest,['hidden','hidden','hidden','hidden']);assert.deepEqual(reasoning.before,reasoning.after);
+    assert(reasoning.minimum>=8,'Irregular bubble stream stays populated across repeated wraps: '+JSON.stringify(reasoning));
+    assert(reasoning.maxGap<reasoning.streamWidth*.5,'Bubble stream does not form a large empty gap');
     const selectAlignment = await win.webContents.executeJavaScript(`(() => {
       window.createEffect=fn=>fn();window.onCleanup=()=>{};
       const screen=document.createElement('section');screen.className='settings-screen';document.body.append(screen);

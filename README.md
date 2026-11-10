@@ -1,9 +1,9 @@
-<p align="center"><img src="docs/readme-header.svg" width="256" height="112" alt="炽阳001 与 Beauty OpenCode，圆角 logo 与竖线分隔"></p>
+<p align="center"><img src="docs/readme-program-logo.svg" width="96" height="96" alt="Beauty OpenCode"> &nbsp;│&nbsp; <a href="https://space.bilibili.com/404891612"><img src="docs/readme-developer-logo.svg" width="96" height="96" alt="炽阳001"></a></p>
 
 <h1 align="center">Beauty OpenCode</h1>
 <p align="center"><strong>让 OpenCode 拥有更舒适的桌面布局</strong></p>
 <p align="center">Codex 风格导航 · 原生会话与模型 · 八套主题 · 一键恢复</p>
-<p align="center"><img src="https://img.shields.io/badge/version-3.1.5-2563eb" alt="版本 3.1.5"> <img src="https://img.shields.io/badge/platform-Windows_x64-0078d4" alt="Windows x64"> <img src="https://img.shields.io/badge/built_with-Electron-47848f" alt="Electron"> <img src="https://img.shields.io/badge/package-Portable-16a34a" alt="便携版"></p>
+<p align="center"><img src="https://img.shields.io/badge/version-3.1.11-2563eb" alt="版本 3.1.11"> <img src="https://img.shields.io/badge/platform-Windows_x64-0078d4" alt="Windows x64"> <img src="https://img.shields.io/badge/built_with-Electron-47848f" alt="Electron"> <img src="https://img.shields.io/badge/package-Portable-16a34a" alt="便携版"></p>
 <p align="center"><a href="#界面预览">界面预览</a> · <a href="#开始使用">开始使用</a> · <a href="#开发与打包">开发与打包</a> · <a href="docs/technical-notes.md">技术说明</a></p>
 
 ---
@@ -14,12 +14,12 @@ Beauty OpenCode 是为 **Windows Electron 版 OpenCode** 制作的独立布局�
 
 ## 界面预览
 
-<p align="center"><img src="screenshots/opencode-2.0.26-home.png" width="960" alt="OpenCode 2.0.26 全新主页"></p>
+<p align="center"><img src="screenshots/opencode-2.2.0-home.png" width="960" alt="OpenCode 2.2.0 全新主页"></p>
 <p align="center"><em>项目与最近聊天集中展示，常驻侧栏让切换更直接。</em></p>
 
 | 桌面切换工具 | 设置与主题 |
 | :---: | :---: |
-| ![Electron 切换工具](screenshots/electron-switcher.png) | ![浅色设置页](screenshots/opencode-2.0.26-settings-light.png) |
+| ![Electron 切换工具](screenshots/electron-switcher.png) | ![浅色设置页](screenshots/opencode-2.2.0-settings-light.png) |
 
 ## 你可以做什么
 
@@ -43,7 +43,7 @@ Beauty OpenCode 是为 **Windows Electron 版 OpenCode** 制作的独立布局�
 
 ## 兼容与恢复
 
-- 适用于 Windows Electron OpenCode，已在 **2.0.30** 原包上完成补丁完整性与恢复验证。保留 **1.18.x** 旧架构适配。
+- 适用于 Windows Electron OpenCode，已在 **2.2.0** 原包上完成补丁完整性、恢复和真实界面验证。保留 **2.0.x** 语义挂载及 **1.18.x** 旧架构适配。
 - 支持 `@opencode-ai/desktop` 和 `@opencode/desktop` 包名。应用前检查资源结构与挂载点，结构变化时会停止写入。后续版本的兼容性取决于其结构。
 - 原始备份为 `resources/app.asar.beauty-original`，校验记录为 `resources/beauty-opencode.json`。
 - 使用 SHA-256 校验、临时文件及原子替换。OpenCode 运行期间拒绝修改。资源被升级或被其他程序修改时，拒绝用旧备份覆盖。
@@ -83,6 +83,18 @@ npm run build
 构建结束前会逐字节校验打包的源码、图片、主题和截图，确认它们与本地输入文件一致。
 
 `npm run test:ui` 使用 Electron 内置 Chromium 验证按钮与消息配色、滑块对比度、侧栏宽度、滚动条和流式时间轴。服务器管理位于“文件 → 服务器管理…”，打开 OpenCode 原生首页；Beauty 侧栏不再插入服务器表单。
+
+3.1.6 适配 OpenCode 2.2.0 的响应式挂载、草稿输入区、虚拟消息时间轴、模型弹窗、项目隐藏、会话导出及原生设置搜索，并补齐配对中文和窄窗布局。`npm run test:ui` 同时载入真实新版动态 CSS，检查四种窗口宽度。`npm run test:native-ui` 可连接独立测试实例的本机调试端口做完整界面回归，需要可用的 Playwright；参数见[技术说明](docs/technical-notes.md)。
+
+3.1.7 修正外观卡片对齐，移除设置中的三种原生布局模式选项。模型与思考强度合成闪电图标胶囊按钮：点击模型名称打开按钮上方的模型列表，点击强度调整思考条，面板内可切换模型或恢复默认强度。气泡采用慢速匀速移动，保持透明度稳定。
+
+3.1.8 移除模型按钮和思考面板的前置图标；思考面板的强度与模型名称合成一个可点击区域。已填充的刻度点隐藏，气泡改为约 3 秒周期的连续流动，移除底部“连接 75 个以上提供商”提示。
+
+3.1.9 将支持思考强度的模型按钮统一为思考面板入口：点击模型名、强度或箭头均打开思考面板；从面板内切换模型。气泡按参考图调整为疏密错落的连续流动。
+
+3.1.10 修复移除项目时传给新版隐藏接口的参数，项目行支持右键打开菜单，与对话行保持一致。
+
+3.1.11 补齐 OpenCode 2.2.0 简体中文语言包，覆盖时间轴、后台活动、文件更改、其他设置和内置模块；快捷键列表中缓存的英文命令名称随中文界面翻译。模型列表取消 Recent 分组，模型仍按提供商展示。保留模型、品牌、快捷键和文件路径等原名。
 
 | 路径 | 用途 |
 | --- | --- |

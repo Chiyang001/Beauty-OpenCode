@@ -1,4 +1,5 @@
 const acorn = require("acorn");
+const {localizeChinese, localizePluginChinese, pluginLocaleFiles, commandCatalogLocalization} = require('./chinese-locale.cjs');
 function tree(source) {
   const ast = acorn.parse(source, {
       ecmaVersion: "latest",
@@ -88,13 +89,18 @@ function discover(source) {
   ).node;
   const signal = named(["observerSlots:null", "comparator:"], "signal");
   const cleanup = named(["cleanups.push", "cleanups===null"], "cleanup");
-  const effect = named([".user=!0", "suspense="], "effect");
+  // Solid 1.9 also exposes createReaction, which shares the user/suspense
+  // markers. Resolve createEffect through onMount's untracked callback instead
+  // of accepting a second scheduler with different calling semantics.
+  const effectCandidates = functions.filter(({ node }) =>
+    [".user=!0", "suspense="].every((key) => compact(node).includes(key)),
+  ).map(({ node }) => node.id.name);
   const onmount = one(
     functions.filter(
       ({ node }) =>
         node.params.length === 1 &&
         node.body.body.length === 1 &&
-        node.body.body[0].expression?.callee?.name === effect &&
+        effectCandidates.includes(node.body.body[0].expression?.callee?.name) &&
         node.body.body[0].expression.arguments[0]?.type ===
           "ArrowFunctionExpression" &&
         node.body.body[0].expression.arguments[0].body.type ===
@@ -102,6 +108,7 @@ function discover(source) {
     ),
     "mount",
   ).node;
+  const effect = onmount.body.body[0].expression.callee.name;
   const untrack = onmount.body.body[0].expression.arguments[0].body.callee.name;
   const navigate = variable([".navigatorFactory()"], "navigate");
   const navNode = parsed.nodes.find(
@@ -143,13 +150,15 @@ function discover(source) {
         compact(node).includes(".lastIndexOf(") &&
         compact(node).includes(".slice(") &&
         node.body.body[0].type === "IfStatement" &&
-        parsed.nodes.filter(
+        ["/", "\\"].every((separator) => parsed.nodes.some(
           (x) =>
             x.node.start > node.start &&
             x.node.end < node.end &&
-            x.node.type === "MemberExpression" &&
-            x.node.property.name === "lastIndexOf",
-        ).length === 2,
+            x.node.type === "CallExpression" &&
+            x.node.callee.type === "MemberExpression" &&
+            x.node.callee.property.name === "lastIndexOf" &&
+            (x.node.arguments[0]?.value ?? x.node.arguments[0]?.quasis?.[0]?.value.cooked) === separator,
+        )),
     ),
     "filename",
   ).node.id.name;
@@ -169,7 +178,7 @@ function discover(source) {
       untrack,
       // 2.0.30 uses unread(id, session) where 2.0.26 used unseenCount(id).
       // Identify the controller by its shared notification and running-state APIs.
-      nativeSessionStatus: named(["notification.session.", "session.pending.list", "unread:", "loading:"], "session status"),
+      nativeSessionStatus: named(["notification.session.", "unread:", "loading:"], "session status"),
       useTheme: context("Theme"),
       useTabs: context("Tabs"),
       useLayout: context("Layout"),
@@ -188,13 +197,38 @@ function edits(source, changes) {
     source = source.slice(0, start) + value + source.slice(end);
   return source;
 }
+function removeRecentModelGroup(source) {
+  const property = (node, key) => node?.type === 'ObjectExpression'
+    ? node.properties.find(p => (p.key?.name ?? p.key?.value) === key)?.value : undefined;
+  const matches = tree(source).nodes.filter(({node}) => {
+    if (node.type !== 'CallExpression') return false;
+    const options = node.arguments[0], titles = property(options, 'titles');
+    return property(options, 'groups') && property(options, 'favorites') && property(options, 'recent') &&
+      titles && source.slice(titles.start, titles.end).includes('dialog.model.favorites') &&
+      source.slice(titles.start, titles.end).includes('dialog.model.recent');
+  });
+  // Both the dialog and compact picker build the same provider/favorite groups.
+  return edits(source, matches.map(({node}) => {
+    const recent = property(node.arguments[0], 'recent');
+    return [recent.start, recent.end, '[]'];
+  }));
+}
 function localizePairing(source) {
-  const dictionaries = tree(source).nodes.filter(({ node }) =>
-    node.type === 'ObjectExpression' &&
-    node.properties.some(p => (p.key?.name ?? p.key?.value) === 'id' &&
-      (p.value?.value ?? p.value?.quasis?.[0]?.value.cooked) === 'pairing') &&
-    node.properties.some(p => (p.key?.name ?? p.key?.value) === 'i18n')
-  ).map(({ node }) => node.properties.find(p => (p.key?.name ?? p.key?.value) === 'i18n').value);
+  const property = (node, key) => node?.type === 'ObjectExpression'
+    ? node.properties.find(p => (p.key?.name ?? p.key?.value) === key)?.value
+    : undefined;
+  const value = node => node?.value ?? (node?.quasis?.length === 1 ? node.quasis[0].value.cooked : undefined);
+  const dictionaries = tree(source).nodes.flatMap(({ node }) => {
+    const dictionary = property(node, 'i18n');
+    if (!dictionary) return [];
+    const english = property(dictionary, 'en');
+    // 2.2 separates the locale descriptor from the pairing API's id. Require
+    // the full group of pairing-specific keys rather than a generic title.
+    const pairing = value(property(node, 'id')) === 'pairing' ||
+      (value(property(english, 'title')) === 'Pairing' &&
+       ['pair.title', 'remote.title', 'screenActive.title', 'qr'].every(key => typeof value(property(english, key)) === 'string'));
+    return pairing ? [dictionary] : [];
+  });
   if (!dictionaries.length) return source; // Older versions do not have pairing.
   if (dictionaries.length !== 1 || dictionaries[0].type !== 'ObjectExpression')
     throw Error('配对语言包结构无法唯一识别');
@@ -379,6 +413,8 @@ function migrate(arc, pkg, html, script, style, source, asset, presets) {
     settings.slice(0, selectStart) +
     `  row.append(beautyNativeSchemeSelect(props.controller.scheme,labels));\n` +
     settings.slice(selectEnd);
+  // The native appearance page already supplies its own full-size heading.
+  settings = settings.replace("heading.textContent='外观';section.append(heading);", "heading.textContent='外观';");
   const bridge = asset("codex-native-bridge.js")
     .toString()
     .replace(/^\uFEFF/, "");
@@ -390,8 +426,10 @@ function migrate(arc, pkg, html, script, style, source, asset, presets) {
   const renameEnd=shell.indexOf("      document.dispatchEvent(new CustomEvent('beauty:session-renamed'",renameStart);
   if(renameStart<0||renameEnd<0)throw Error('无法定位会话菜单重命名逻辑');
   shell=shell.slice(0,renameStart)+"      if(!await sessions.session.rename(ServerConnection.key(home.server.focused()),session,value))throw Error('重命名失败');\n"+shell.slice(renameEnd);
-  const runtime = `\nfunction beautyNativeRuntime(action,payload){const ${aliases};const createHomeController=beautyNativeHome,createHomeSessionsController=beautyNativeSessions;const on=(read,run)=>()=>{const value=read();return untrack(()=>run(value));};\n${asset("theme-presets.js").toString().replaceAll("window.api", "beautyDesktopApi")}\n${shell}\n${settings}\n${bridge}\nif(action==='shell'){window.beautyAppearanceSection=props=>beautyNativeRuntime('appearance',props);window.beautyReasoningSlider=control=>beautyNativeRuntime('reasoning',control);return createBeautyShell();}if(action==='home')return BeautyHome();if(action==='appearance'){beautyPresetInit().apply(useTheme().mode());void beautyWallpaperInit().mount();return beautyAppearanceSection(payload);}if(action==='reasoning')return beautyReasoningSlider(payload); }\n`;
+  const runtime = `\nfunction beautyNativeRuntime(action,payload){const ${aliases};const createHomeController=beautyNativeHome,createHomeSessionsController=beautyNativeSessions;const on=(read,run)=>()=>{const value=read();return untrack(()=>run(value));};\n${asset("theme-presets.js").toString().replaceAll("window.api", "beautyDesktopApi")}\n${shell}\n${settings}\n${bridge}\nif(action==='shell'){window.beautyAppearanceSection=props=>beautyNativeRuntime('appearance',props);window.beautyReasoningSlider=control=>beautyNativeRuntime('reasoning',control);return createBeautyShell();}if(action==='home')return BeautyHome();if(action==='appearance'){beautyPresetInit().apply(useTheme().mode());void beautyWallpaperInit().mount();return beautyAppearanceSection(payload);}if(action==='reasoning')return beautyNativeReasoningSlider(payload); }\n`;
+  const catalogLocalization = commandCatalogLocalization(source, d.parsed);
   const changes = [
+    ...catalogLocalization.changes,
     [
       d.layout.body.start + 1,
       d.layout.body.start + 1,
@@ -404,15 +442,18 @@ function migrate(arc, pkg, html, script, style, source, asset, presets) {
     ],
   ];
   // Hide the native sidebar branch rather than modifying the user's preferences.
-  const match = [
-    ...source.matchAll(
-      /([A-Za-z_$][\w$]*)\.appearance\.tabLayout\(\)===(["'`])vertical\2/g,
-    ),
-  ];
-  if (match.length !== 1) throw Error("垂直侧栏结构不匹配");
-  changes.push([match[0].index, match[0].index + match[0][0].length, "false"]);
+  const sidebarBranches = d.parsed.nodes.filter(({ node }) => {
+    if (node.type !== "BinaryExpression" || node.start < d.layout.start || node.end > d.layout.end)
+      return false;
+    const value = node.right.value ?? node.right.quasis?.[0]?.value.cooked;
+    return source.slice(node.left.start, node.left.end).replace(/\s+/g, "").endsWith(".appearance.tabLayout()") &&
+      ((node.operator === "===" && value === "vertical") ||
+       (node.operator === "!==" && value === "horizontal"));
+  });
+  if (sidebarBranches.length !== 1) throw Error("垂直侧栏结构不匹配");
+  changes.push([sidebarBranches[0].node.start, sidebarBranches[0].node.end, "false"]);
   const replacements = {
-    [script]: Buffer.from(localizePairing(edits(source, changes)) + runtime),
+    [script]: Buffer.from(localizePluginChinese(localizePairing(edits(source, changes))) + catalogLocalization.runtime + runtime),
     [style]: Buffer.concat([
       arc.read(style),
       Buffer.from("\n/* Beauty OpenCode native v2 full migration */\n"),
@@ -427,12 +468,19 @@ function migrate(arc, pkg, html, script, style, source, asset, presets) {
     ),
     ...presets,
   };
+  const chinesePluginFiles = pluginLocaleFiles(source);
   let appearanceFound = false,
     reasoningFound = false;
   for (const name of arc.index.keys()) {
     if (!/^out\/renderer\/assets\/.*\.js$/.test(name) || name === script)
       continue;
     let chunk = arc.read(name).toString();
+    if (chunk.includes('dialog.model.recent') && chunk.includes('dialog.model.favorites'))
+      chunk = removeRecentModelGroup(chunk);
+    if (/^out\/renderer\/assets\/zh-[^/]+\.js$/.test(name))
+      chunk = localizeChinese(chunk, chinesePluginFiles.get(name.split('/').at(-1)));
+    if (chunk.includes('i18n') && chunk.includes('Pairing') && chunk.includes('screenActive.'))
+      chunk = localizePairing(chunk);
     if (
       chunk.includes("settings.appearance.description") &&
       chunk.includes("settings-color-scheme")
@@ -458,10 +506,17 @@ function migrate(arc, pkg, html, script, style, source, asset, presets) {
         chunk.slice(fn.start, fn.end),
       )?.[1];
       if (!controller) throw Error("外观控制器不匹配");
+      const controls = ret.argument.elements.filter(node =>
+        node && chunk.slice(node.start, node.end).includes('settings-color-scheme') &&
+        chunk.slice(node.start, node.end).includes('settings-theme'));
+      const headers = ret.argument.elements.filter(node =>
+        node && chunk.slice(node.start, node.end).includes('settings.appearance.description'));
+      if (controls.length !== 1 || headers.length !== 1 || headers[0].end > controls[0].start)
+        throw Error('外观分组结构不匹配');
       chunk = edits(chunk, [
         [
-          ret.argument.start + 1,
-          ret.argument.start + 1,
+          controls[0].start,
+          controls[0].start,
           `window.beautyAppearanceSection({controller:${controller}}),`,
         ],
       ]);
@@ -510,4 +565,4 @@ function migrate(arc, pkg, html, script, style, source, asset, presets) {
       });
   return { pkg, adapter: "native-v2", replacements, bindings };
 }
-module.exports = { tree, discover, migrate, localizePairing };
+module.exports = { tree, discover, migrate, localizePairing, removeRecentModelGroup };
